@@ -1,7 +1,13 @@
+## Importing packages
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+import glob
+import os
+import shutil
 
+
+## Getting coefficients of conic section from five points
 def fivePointsToConic(points, f = 1.0):
 	"""Solve for the coefficients of a conic given five points in Numpy array
 
@@ -20,12 +26,16 @@ def fivePointsToConic(points, f = 1.0):
 
 	x = points[:, 0]
 	y = points[:, 1]
+
 	if max(x.shape) < 5:
+
 		raise ValueError('Need >= 5 points to solve for conic section')
 
 	A = np.vstack([x**2, x * y, y**2, x, y]).T
 	fullSolution = lstsq(A, f * np.ones(x.size), rcond=None)
+
 	(a, b, c, d, e) = fullSolution[0]
+
 	coeffs = {
 		'a':a,
 		'b':b,
@@ -34,64 +44,115 @@ def fivePointsToConic(points, f = 1.0):
 		'e':e,
 		'f':f
 	}
+
 	return coeffs
 
 
-def main():
+## Get five input points from an image
+def get_points(im):
 
-	p1 = [20, 30]
-	p2 = [30, 56]
-	p3 = [60, 80]
-	p4 = [20, 60]
-	p5 = [400, 260]
+	# Clear plots
+	plt.clf()
 
-	points = [p1, p2, p3, p4, p5]
-	points = np.array(points)
+	# Display image
+	plt.imshow(im)
 
-	cs = fivePointsToConic(points)
+	# Get input points
+	ps = plt.ginput(5)
 
-	array = []
+	# Close plot
+	plt.close()
 
-	dims = (512, 512)
+	# Clear plots
+	plt.clf()
 
-	for x in range(dims[0]):
+	# Return points as list of lists
+	return np.array([[p[0], p[1]] for p in ps])
 
-		row = []
 
+## Generate mask from image
+def generate_mask(path):
+
+	# Path to store masks
+	maskDirPath = 'output/' + path.split('/')[-2] + '/masks/'
+
+	# Path to store image
+	imageName = maskDirPath + path.split('/')[-1]
+
+	# Clear plots
+	plt.clf()
+
+	# Open image
+	image = Image.open(path)
+
+	# Store whether mask is correct
+	correct = 'n'
+
+	# Repeat script until user says is correct
+	while correct != 'Y':
+
+		# Get five points from image
+		points = get_points(image)
+
+		# Get coefficients for conic section from points
+		cs = fivePointsToConic(points)
+
+		# To store mask
+		array = []
+
+		# Get dimensions of mask
+		dims = image.size
+
+		# Finding out whether a point will be part of the masks
 		for y in range(dims[1]):
 
-			LHS = cs['a']*(x**2) + cs['b']*(x*y) + cs['c']*(y**2) + cs['d']*(x) + cs['e']*(y)
-			RHS = cs['f']
+			# Storing each row
+			row = []
 
-			if LHS <= RHS:
+			# Generating row
+			for x in range(dims[0]):
 
-				row.append(0)
+				# Left hand side of ellipse equation
+				LHS = cs['a']*(x**2) + cs['b']*(x*y) + cs['c']*(y**2) + cs['d']*(x) + cs['e']*(y)
 
-			else:
+				# Right hand side of ellipse equation
+				RHS = cs['f']
 
-				row.append(1)
+				# Checking if the point is outside the mask
+				if LHS <= RHS:
 
-		array.append(np.asarray(row))
+					# Storing not in mask
+					row.append(0)
 
-	array = (np.asarray(array))
+				# If the point is in the mask
+				else:
 
-	im = Image.fromarray(np.uint8(array * 255), 'L')
+					# Storing in the mask
+					row.append(1)
 
-	plt.imshow(im)
-	plt.show()
+			# Adding row to array
+			array.append(np.asarray(row))
 
-if __name__ == '__main__':
+		# Converting array to numpy array
+		array = (np.asarray(array))
 
-	# main()
+		# Generate mask
+		mask = Image.fromarray(np.uint8(array * 255), 'L')
 
-	# Implementation of matplotlib function
+		# Displaying results
+		f, axarr = plt.subplots(2)
+		axarr[0].imshow(mask)
+		axarr[1].imshow(image)
 
-	im = Image.open('face.jpg')
+		# Show image
+		plt.show()
 
-	plt.imshow(im)
+		# Clear plots
+		plt.clf()
 
-	print("After 5 clicks :")
-	x = plt.ginput(5)
-	print(x)
+		# Flag to store if correct
+		correct = input('Does this look correct? [Y/n]: ')
 
-	plt.show()
+	# Save mask
+	mask.save(imageName)
+
