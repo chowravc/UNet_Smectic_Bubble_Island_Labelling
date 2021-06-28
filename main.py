@@ -10,29 +10,10 @@ from utils import *
 
 if __name__ == '__main__':
 
-	outputDir = 'output/'
+	directory = 'input/309_tm_25C_top_need_35C/'
 
-	# Create output directory if doesn't exist
-	if len(glob.glob(outputDir)) == 0:
+	crop_bb_all(directory)
 
-		os.mkdir(outputDir)
+	outDir = 'output/309_tm_25C_top_need_35C/'
 
-	# Create mask directory if doesn't exist
-
-	outDir = outputDir + 'example/'
-
-	if len(glob.glob(outDir)) != 0:
-
-		shutil.rmtree(outDir)
-
-	os.mkdir(outDir)
-
-	# Create mask directory
-
-	maskDir = outDir + 'masks/'
-
-	os.mkdir(maskDir)
-
-	imPath = 'input/example/face.jpg'
-
-	generate_mask(imPath)
+	generate_mask_all(outDir)

@@ -6,6 +6,14 @@ import glob
 import os
 import shutil
 
+## Outputs smaller of the numbers
+def smaller(n1, n2):
+
+	if n1 <= n2:
+		return n1
+	else:
+		return n2
+
 
 ## Getting coefficients of conic section from five points
 def fivePointsToConic(points, f = 1.0):
@@ -71,13 +79,7 @@ def get_points(im):
 
 
 ## Generate mask from image
-def generate_mask(path):
-
-	# Path to store masks
-	maskDirPath = 'output/' + path.split('/')[-2] + '/masks/'
-
-	# Path to store image
-	imageName = maskDirPath + path.split('/')[-1]
+def generate_mask(path, outPath):
 
 	# Clear plots
 	plt.clf()
@@ -151,8 +153,170 @@ def generate_mask(path):
 		plt.clf()
 
 		# Flag to store if correct
-		correct = input('Does this look correct? [Y/n]: ')
+		correct = input('Does this look correct? [Y/n]. Input [invert] if you want to invert and save mask: ')
+
+		if correct == 'invert':
+
+			maskInvert = np.copy(mask)
+
+			for i in range(len(mask)):
+
+				for j in range(len(mask[0])):
+
+					if mask[i][j] == 0:
+
+						maskInvert[i][j] = 0
+
+					else:
+
+						maskInvert[i][j] = 255
 
 	# Save mask
-	mask.save(imageName)
 
+	if correct != 'invert':
+		mask.save(outPath)
+	else:
+		maskInvert.save(outPath)
+
+## Generate masks from cropped images
+def generate_mask_all(outPath):
+
+	# Path to access cropped images
+	croppedPath = outPath + 'cropped/'
+
+	# Path to save masks
+	maskPath = outPath + 'masks/'
+
+	# Create dir to store masks
+	if len(glob.glob(maskPath)) == 0:
+		os.mkdir(maskPath)
+
+	croppedIms = glob.glob(croppedPath + '*')
+
+	nCropped = len(croppedIms)
+
+	print('\nFound ' + str(nCropped) + ' cropped images.')
+
+	for cropped_im in croppedIms:
+
+		imageName = cropped_im.split('\\')[-1].split('.')[-2]
+
+		maskName = maskPath + imageName + '.png'
+
+		print()
+		print(cropped_im, maskName)
+
+		if len(glob.glob(maskName)) == 0:
+			generate_mask(cropped_im, maskName)
+		else:
+			print('Already exists.')
+
+## Crop out bounding boxes from one image
+def crop_bb(croppedPath, imPath, labelPath):
+
+	# Prefix to cropped image
+	prefix = croppedPath + imPath.split('/')[-1].split('.')[0] + '_'
+
+	# Load labels for the image
+	labels = np.loadtxt(labelPath)
+
+	# How many cropped bounding boxes are there
+	nCropped = len(labels)
+
+	# Fill to output
+	fill = len(str(nCropped))
+
+	# Open image
+	im = Image.open(imPath)
+
+	# Get image dimensions
+	width, height = im.size
+
+	# For every image to be cropped (possibly)
+	for j in range(nCropped):
+
+		# Do only one in ninety-seven crops
+		if j%97 == 0:
+
+			# Name of cropped image
+			outCropped = prefix + str(j).zfill(fill) + '.tif'
+
+			# Extract particular line
+			line = labels[j]
+
+			# Format of label
+			# class x_center y_center width height confidence
+
+			# X center ratio
+			x_c = line[1]
+			# Y center ratio
+			y_c = line[2]
+
+			# Width of bounding box ratio
+			w = line[3]
+			# Height of bounding box ratio
+			h = line[4]
+
+			# Semi width in pixels
+			semi_w = int(width*w/2)
+			# Semi height in pixels
+			semi_h = int(height*h/2)
+			 
+			# Setting the points for cropped image
+			left = int(x_c*width) - semi_w
+			top = int(y_c*height) - semi_h
+			right = int(x_c*width) + semi_w
+			bottom = int(y_c*height) + semi_h
+			 
+			# Cropped image
+			cropped = im.crop((left, top, right, bottom))
+
+			# Save cropped image
+			cropped.save(outCropped)
+
+## Crop out bounding boxes from images
+def crop_bb_all(dirPath):
+
+	imageDir = directory + 'images/'
+	labelDir = directory + 'labels/'
+
+	outputDir = 'output/'
+
+	if len(glob.glob(outputDir)) == 0:
+
+		os.mkdir(outputDir)
+
+	outDir = outputDir + dirPath.split('/')[-2] + '/'
+
+	if len(glob.glob(outDir)) != 0:
+
+		shutil.rmtree(outDir)
+
+	os.mkdir(outDir)
+
+	croppedDir = outDir + 'cropped/'
+
+	os.mkdir(croppedDir)
+
+	nIm = len(glob.glob(imageDir + '*'))
+	nLb = len(glob.glob(labelDir + '*'))
+
+	if nIm != nLb:
+
+		print('\nFound different numbers of images and labels.')
+
+	for i in range(smaller(nIm, nLb)):
+
+		# Do only one in eleven images
+		if i%11 == 0:
+
+			print(str(100*i/smaller(nIm, nLb))[:4] + '%')
+
+			fId = str(i).zfill(4)
+
+			imagePath = imageDir + fId + '.tif'
+			labelPath = labelDir + fId + '.txt'
+
+			if len(glob.glob(imagePath)) == 1 and len(glob.glob(labelPath)) == 1:
+
+				crop_bb(croppedDir, imagePath, labelPath)
